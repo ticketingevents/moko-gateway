@@ -1,0 +1,18 @@
+services:
+
+  agify:
+    path: age.service
+    url: https://api.agify.io
+
+  genderize:
+    path: gender.service
+    url: https://api.genderize.io
+
+  nationalize:
+    path: nationality.service
+    url: https://api.nationalize.io
+
+  restcountries:
+    path: country.service
+    url: https://restcountries.com/v3.1
+  

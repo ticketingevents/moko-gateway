@@ -1,0 +1,54 @@
+workflows:
+  not_allowed:
+    steps:
+      - data: []
+        pipelines:
+          not_allowed:
+            input: []
+            tasks: [MethodNotAllowed]
+
+  no_content:
+    steps:
+      - data: []
+        pipelines:
+          no_content:
+            input: []
+            tasks: [NoContent]
+
+  api_key_auth:
+    steps:
+      - data:
+          key: headers:x-api-key
+        pipelines: []
+
+  build_user:
+    steps:
+      - data:
+          name: uri:user
+        pipelines:
+          retrieve_age:
+            input: [name]
+            tasks: [GuessAge]
+          retrieve_gender:
+            input: [name]
+            tasks: [GuessGender]
+          retrieve_nationality:
+            input: [name]
+            tasks: [GuessNationality, country.LookupCountry]
+      - data:
+          age: retrieve_age:age
+          gender: retrieve_gender:gender
+          nationality: retrieve_nationality:demonym
+        pipelines:
+          assemble_profile:
+            input: [age, gender, nationality]
+            tasks: [BuildProfile]
+
+  lookup_country:
+    steps:
+      - data:
+          code: uri:country
+        pipelines:
+          lookup_country:
+            input: [code]
+            tasks: [country.LookupCountry]

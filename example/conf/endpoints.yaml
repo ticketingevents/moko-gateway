@@ -1,0 +1,39 @@
+defaults:
+  cors:
+    origin: "*"
+    methods: ['GET',"POST","PUT","DELETE","OPTIONS"]
+    headers:
+      request: ['Authorization']
+      response: ['ETag']
+    lifetime: 86400
+  methods:
+    get:
+      workflow: not_allowed
+      restrictions:
+        authenticate: api_key_auth
+        allow: ["key:test1234"]
+    post:
+      workflow: not_allowed
+    put:
+      workflow: not_allowed
+    delete:
+      workflow: not_allowed
+    options:
+      workflow: no_content
+
+endpoints:
+
+  user_resource:
+    uri: /users/:user
+    cors:
+      headers:
+        request: ['Authorization','If-Modified-Since']
+    methods:
+      get:
+        workflow: build_user
+
+  country_resource:
+    uri: /countries/:country
+    methods:
+      get:
+        workflow: lookup_country

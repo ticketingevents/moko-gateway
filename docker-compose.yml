@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+
+  moko:
+    image: ticketing/moko
+    build:
+      context: .
+    restart: always
+    ports:
+      - 8000:80
+    volumes:
+      - ./example:/home/moko/project
+      - ./example/conf/defaults.yaml:/usr/local/openresty/site/lualib/moko/conf/defaults.yaml
