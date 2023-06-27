@@ -12,8 +12,10 @@ for name, service in services.items():
 	os.environ["SERVICE_URL"] = service["url"]
 	os.environ["DOLLAR"] = "$"
 
+	service_template = "service.external.template" if service["external"] else "service.internal.template"
+
 	service_dir = "/usr/local/openresty/nginx/services"
 	os.system(
-		"envsubst < %s/service.template > %s/%s.conf" % 
-		(service_dir, service_dir, service["path"])
+		"envsubst < %s/%s > %s/%s.conf" % 
+		(service_dir, service_template, service_dir, service["path"])
 	)

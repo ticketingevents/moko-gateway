@@ -33,7 +33,7 @@ function Service:new(instance, name)
 	services = yaml.eval(serviceDefinitions)["services"]
 
 	if services[name] then
-		self.path = "/"..services[name].path
+		instance.path = "/"..services[name].path
 	else
 		error({code=500, error="Requested service '"..name.."' does not exist."})
 	end
@@ -102,7 +102,7 @@ function Service:request(parameters)
 		{
 			args = parameters.args or nil,
 			method = parameters.method or ngx.HTTP_GET,
-			body = parameters.body or nil
+			body = cjson.encode(parameters.body) or nil
 		}
 	)
 

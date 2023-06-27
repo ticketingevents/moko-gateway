@@ -15,6 +15,7 @@ local pcall = pcall
 local next = next
 local gmatch  = string.gmatch
 local unpack  = table.unpack
+local join = require "moko.utilities".join
 
 -- Encapsulate package
 setfenv(1, package)
@@ -27,7 +28,7 @@ function Workflow:new(instance)
 	setmetatable(instance, self)
 
 	self.__index = self
-	self.steps = {}
+	instance.steps = {}
 
 	return instance
 end
@@ -47,17 +48,26 @@ function Workflow:run(stepInput)
 
 		-- Initialise pipeline input
 		local pipelineInput = {}
+		local missingInput = {}
 		for field, template in pairs(step["data"]) do
 			-- Fetch value from input
 			pipelineInput[field] = stepInput
 			for part in gmatch(template, "[^:]+") do
-				pipelineInput[field] = pipelineInput[field][part]
-
 				if pipelineInput[field] == nil then
-					error(400, "Missing required requzst data")
-					return
+					missingInput[#missingInput+1] = field
+				else
+					pipelineInput[field] = pipelineInput[field][part]
 				end
 			end 
+		end
+
+		if #missingInput > 0 then
+			error({
+				code=400,
+				error="Missing required request data: "..join(missingInput)
+			})
+
+			return
 		end
 
 		-- Execute Pipelines
@@ -98,6 +108,12 @@ function Workflow:run(stepInput)
 				taskInput = taskOutput.response
 
 				-- If any task returns an non-success code we raise an error
+				if taskOutput.code == nil then
+					ngx.say(name)
+					ngx.say(cjson.encode(taskOutput))
+					ngx.exit(500)
+				end
+
 				if taskOutput.code > 299 then
 					error({code=taskOutput.code, error=taskOutput.response.error})
 				end

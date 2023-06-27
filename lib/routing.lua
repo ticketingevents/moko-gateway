@@ -16,21 +16,9 @@ local pairs = pairs
 local gsub  = string.gsub
 local gmatch  = string.gmatch
 local Workflow = require "moko.workflow".Workflow
+local join = require "moko.utilities".join
 local pcall = pcall
 local type = type
-
--- Private functions
-local join = function(list, glue)
-	local joined = ""
-	for i, element in pairs(list) do
-		joined = joined .. element
-		if i < #list then
-			 joined = joined .. ", "
-		end
-	end
-
-	return joined
-end
     
 -- Encapsulate package
 setfenv(1, package)
@@ -43,7 +31,7 @@ function Router:new(instance)
 	setmetatable(instance, self)
 
 	self.__index = self
-	self.route = require "resty.route".new()
+	instance.route = require "resty.route".new()
 
 	-- Load endpoint default and definitions
 	endpointFile = io.open("/home/moko/project/conf/endpoints.yaml")
@@ -51,8 +39,8 @@ function Router:new(instance)
 		string.gsub(endpointFile:read("*all"), "\n\n", "\n")
 	)
 
-	self.defaults = endpointDefinitions["defaults"] or {}
-	self.endpoints = endpointDefinitions["endpoints"] or {}
+	instance.defaults = endpointDefinitions["defaults"] or {}
+	instance.endpoints = endpointDefinitions["endpoints"] or {}
 
 	-- Load workflow definitions
 	workflowFile = io.open("/home/moko/project/conf/workflows.yaml")
@@ -60,7 +48,7 @@ function Router:new(instance)
 		string.gsub(workflowFile:read("*all"), "\n\n", "\n")
 	)
 
-	self.workflows = workflowDefinitions["workflows"] or {}
+	instance.workflows = workflowDefinitions["workflows"] or {}
 
 	return instance
 end
@@ -73,6 +61,7 @@ function Router:initialise()
 		for method, definition in pairs(self.defaults.methods) do
 			methods[method] = {
 				workflow = definition.workflow or nil,
+				guard = definition.guard or nil,
 				restrictions = definition.restrictions or nil
 			}
 		end
@@ -167,8 +156,28 @@ function Router:buildHandler(method, endpoint)
 	self:handleCors(endpoint)
 
 	return function(router, ...)
-		-- Assemble request to input to workflow
+		-- Assemble request to input to workflows
 		local request = self:buildRequest(endpoint.uri, {...})
+
+		-- Run guard workflow to determine if route can be run
+		if method.guard then
+			local success, output = self:runWorkflow(
+				method.guard,
+				request
+			)
+
+			if success then
+				-- Block request if the workflow returned an error code
+				if output.code > 299 then
+					ngx.status = output.code
+					router:json(output.response)
+					return
+				end
+			else
+				self:logError(router, output)
+				return
+			end
+		end
 
 		-- If endpoint is restrictionsed run authentication workflow
 		if method.restrictions then
@@ -212,14 +221,7 @@ function Router:buildHandler(method, endpoint)
 			ngx.status = output.code
 			router:json(output.response)
 		else
-			if type(output) == "table" then
-				ngx.status = output.code
-				router:json({error=output.error})
-			else
-				ngx.status = 500
-				router:json({error="There was a server error while excuting this request. Please see system logs for details."})
-				ngx.log(ngx.ERR, output)
-			end
+			self:logError(router, output)
 		end
 	end
 end
@@ -248,6 +250,17 @@ end
 
 function Router:dispatch()
 	self.route :dispatch()
+end
+
+function Router:logError(router, error)
+	if type(error) == "table" then
+		ngx.status = error.code
+		router:json({error=error.error})
+	else
+		ngx.status = ngx.HTTP_INTERNAL_SERVER_ERROR
+		router:json({error="There was a server error while excuting this request. Please see system logs for details."})
+		ngx.log(ngx.ERR, error)
+	end
 end
 
 return package

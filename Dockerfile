@@ -16,7 +16,7 @@ COPY ./lib /usr/local/openresty/site/lualib/moko
 # Copy nginx config
 COPY ./conf/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 COPY ./conf/moko.conf /usr/local/openresty/nginx/sites/moko.conf
-COPY ./conf/service.template /usr/local/openresty/nginx/services/service.template
+COPY ./conf/service.*.template /usr/local/openresty/nginx/services/
 
 RUN mkdir /home/moko
 WORKDIR /home/moko

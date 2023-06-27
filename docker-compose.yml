@@ -11,4 +11,3 @@ services:
       - 8000:80
     volumes:
       - ./example:/home/moko/project
-      - ./example/conf/defaults.yaml:/usr/local/openresty/site/lualib/moko/conf/defaults.yaml
