@@ -205,6 +205,9 @@ function Router:buildHandler(method, endpoint)
 						router:json({error="You are restricted from accessing this resource"})
 						return
 					end
+
+          -- If user is authorised assign their details to the request
+          request.user = user
 				end
 			else
 					ngx.status = ngx.HTTP_UNAUTHORIZED
