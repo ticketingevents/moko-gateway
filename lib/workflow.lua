@@ -12,10 +12,12 @@ local pairs = pairs
 local ipairs = ipairs
 local error = error
 local pcall = pcall
+local ngx = ngx
 local next = next
 local gmatch  = string.gmatch
 local unpack  = table.unpack
 local join = require "moko.utilities".join
+local cjson = require "cjson.safe"
 
 -- Encapsulate package
 setfenv(1, package)
@@ -91,11 +93,14 @@ function Workflow:run(stepInput)
 				-- Attempt to load task from user space
 				success, TaskClass = pcall(require, "moko.tasks.user."..name)
 				if not success then
+          local error_message = TaskClass
+
 					-- Attempt to load system task
 					success, TaskClass = pcall(require, "moko.tasks.system."..name)
 
 					-- If no matching task was found
 					if not success then
+            ngx.log(ngx.ERR, error_message)
 						error({code=404, error="Task "..name.." is not defined."})
 					end
 				end
@@ -107,13 +112,6 @@ function Workflow:run(stepInput)
 				taskOutput = task:execute(taskInput)
 				taskInput = taskOutput.response
 
-				-- If any task returns an non-success code we raise an error
-				if taskOutput.code == nil then
-					ngx.say(name)
-					ngx.say(cjson.encode(taskOutput))
-					ngx.exit(500)
-				end
-
 				if taskOutput.code > 299 then
 					error({code=taskOutput.code, error=taskOutput.response.error})
 				end
@@ -121,6 +119,17 @@ function Workflow:run(stepInput)
 
 			-- Assign final task output to step output
 			stepOutput[label] = taskOutput.response
+
+      -- If there are any step output filters, apply them
+      if step["filters"] then
+        local filteredOutput = {}
+        for i, filter in pairs(step["filters"]) do
+          filteredOutput[filter] = stepOutput[label][filter]
+        end
+
+        stepOutput[label] = filteredOutput
+      end
+
 			exitCode = taskOutput.code
 		end
 

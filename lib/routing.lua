@@ -188,27 +188,32 @@ function Router:buildHandler(method, endpoint)
 		
 			if authenticated then
 				-- Check that the authenticated user has access
-				local allowedValue = nil
-				for i, tag in pairs(method.restrictions.allow) do
-					-- Get allowed user value
-					local parts = {}
-					for part in gmatch(tag, "[^:]+") do
-						parts[#parts+1] = part
-					end
+				for field, criteria in pairs(method.restrictions.allow) do
+          -- Case criteria to table if necessary
+          if type(criteria) ~= 'table' then
+            criteria = {criteria}
+          end
 
-					local key = parts[1]
-					local value = parts[2]
+          -- Check that the user matches at least one value for this criteria
+          local matching_criteria = false
 
-					-- Check that user has allowed value
-					if user.response[key] ~= value then
-						ngx.status = ngx.HTTP_FORBIDDEN
-						router:json({error="You are restricted from accessing this resource"})
-						return
-					end
+          for i, value in pairs(criteria) do
+  					-- Check that user has allowed value
+  					if user.response[field] == value then
+              matching_criteria = true
+  					end
+          end
 
-          -- If user is authorised assign their details to the request
-          request.user = user
+          -- If the user matches no values for this criteria they don't have access
+          if matching_criteria == false then
+            ngx.status = ngx.HTTP_FORBIDDEN
+            router:json({error="You are restricted from accessing this resource"})
+            return
+          end
 				end
+
+        -- If user is authorised assign their details to the request
+        request.user = user.response
 			else
 					ngx.status = ngx.HTTP_UNAUTHORIZED
 					router:json({error="Your request could not be authenticated."})
