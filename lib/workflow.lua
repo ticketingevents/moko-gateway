@@ -83,12 +83,12 @@ function Workflow:run(stepInput)
 			end
 
 			-- Iterate through pipeline's tasks
-			local taskOutput = {}
+			local taskOutput = {code=0, response={}}
 			local task = {}
 
 			for i, name in pairs(pipeline["tasks"]) do
 				-- Clear task output
-				taskOutput = {}
+				taskOutput = {code=0, response={}}
 
 				-- Attempt to load task from user space
 				success, TaskClass = pcall(require, "moko.tasks.user."..name)
@@ -109,12 +109,38 @@ function Workflow:run(stepInput)
 				task = TaskClass:new()
 
 				-- Pipe task output to next task in pipeline
-				taskOutput = task:execute(taskInput)
-				taskInput = taskOutput.response
+        if #taskInput == 0 then
+          taskInput = {taskInput}
+        end
 
-				if taskOutput.code > 299 then
-					error({code=taskOutput.code, error=taskOutput.response.error})
-				end
+        taskOutput.response = {}
+        for i, input in pairs(taskInput) do
+          output = task:execute(input)
+
+          if output.code > 299 then
+            error({
+              code=output.code,
+              error=output.response.error
+            })
+          end
+
+          if taskOutput.code < output.code then
+            taskOutput.code = output.code
+          end
+
+          taskOutput.response[i] = output.response
+        end
+
+        -- Assign input for next task
+        taskInput = {}
+        for i, output in pairs(taskOutput.response) do
+          taskInput[i] = output
+        end
+
+        if #taskInput == 1 then
+          taskInput = taskInput[1]
+          taskOutput.response = taskOutput.response[1]
+        end
 			end
 
 			-- Assign final task output to step output

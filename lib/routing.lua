@@ -163,7 +163,8 @@ function Router:buildHandler(method, endpoint)
 		if method.guard then
 			local success, output = self:runWorkflow(
 				method.guard,
-				request
+				request,
+        router
 			)
 
 			if success then
@@ -183,7 +184,8 @@ function Router:buildHandler(method, endpoint)
 		if method.restrictions then
 			local authenticated, user = self:runWorkflow(
 				method.restrictions.authenticate,
-				request
+				request,
+        router
 			)
 		
 			if authenticated then
@@ -222,7 +224,7 @@ function Router:buildHandler(method, endpoint)
 		end
 
 		-- Execute main endpoint workflow
-		local success, output = self:runWorkflow(method.workflow, request)
+		local success, output = self:runWorkflow(method.workflow, request, router)
 		
 		-- Report success or error as necessary
 		if success then
@@ -234,7 +236,7 @@ function Router:buildHandler(method, endpoint)
 	end
 end
 
-function Router:runWorkflow(label, request)
+function Router:runWorkflow(label, request, router)
 	-- Check if workflow exists
 	if self.workflows[label] then
 
@@ -253,6 +255,8 @@ function Router:runWorkflow(label, request)
 		ngx.status = 500
 		router:json({error="There was a server error while excuting this request. Please see system logs for details."})
 		ngx.log(ngx.ERR, "Can't find tye '"..label.."' workflow specified for endpoint: "..ngx.var.uri)
+
+    return {false, nil}
 	end
 end
 
