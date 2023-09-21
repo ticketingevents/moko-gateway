@@ -40,7 +40,8 @@ function Workflow:add_step(step)
 	self.steps[#self.steps+1] = step
 end
 
-function Workflow:run(stepInput)
+function Workflow:run(request)
+  local stepInput = {}
 	local stepOutput = {}
 	local exitCode = 0
 
@@ -48,29 +49,39 @@ function Workflow:run(stepInput)
 		-- Reset step output
 		stepOutput = {}
 
-		-- Initialise pipeline input
-		local pipelineInput = {}
-		local missingInput = {}
-		for field, template in pairs(step["data"]) do
-			-- Fetch value from input
-			pipelineInput[field] = stepInput
-			for part in gmatch(template, "[^:]+") do
-				if pipelineInput[field] == nil then
-					missingInput[#missingInput+1] = field
-				else
-					pipelineInput[field] = pipelineInput[field][part]
-				end
-			end 
-		end
+		-- Parse step input values for pipeline input
+		local pipelineRequestInput, missingRequestInput = self:parseInput(request, step)
 
-		if #missingInput > 0 then
-			error({
-				code=400,
-				error="Missing required request data: "..join(missingInput)
-			})
+    -- Parse request values for pipeline input
+    local pipelineStepInput, missingStepInput = self:parseInput(stepInput, step)
 
-			return
-		end
+    -- Check if any input could not be found from either source
+    local missingInput = {}
+    for i, field in ipairs(missingRequestInput) do
+      if missingStepInput[field] ~= nil then
+        missingInput[#missingInput+1] = field
+      end
+    end
+
+    if #missingInput > 0 then
+      error({
+        code=400,
+        error="Missing required request data: "..join(missingInput)
+      })
+
+      return
+    end
+
+    -- Merge input sources
+    local pipelineInput = {}
+
+    for field, value in pairs(pipelineRequestInput) do
+      pipelineInput[field] = value
+    end
+
+    for field, value in pairs(pipelineStepInput) do
+      pipelineInput[field] = value
+    end
 
 		-- Execute Pipelines
 		for label, pipeline in pairs(step["pipelines"]) do
@@ -177,6 +188,26 @@ function Workflow:run(stepInput)
 	end
 
 	return {code=exitCode, response=workflowOutput}
+end
+
+function Workflow:parseInput(input, step)
+  local templates = step["data"]
+  local parsedInput = {}
+  local missingInput = {}
+
+  for field, template in pairs(templates) do
+    -- Fetch value from input
+    parsedInput[field] = input
+    for part in gmatch(template, "[^:]+") do
+      if parsedInput[field] == nil then
+        missingInput[field] = field
+      else
+        parsedInput[field] = parsedInput[field][part]
+      end
+    end 
+  end
+
+  return parsedInput, missingInput
 end
 
 return package
