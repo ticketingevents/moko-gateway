@@ -120,8 +120,12 @@ function Workflow:run(request)
 				task = TaskClass:new()
 
 				-- Pipe task output to next task in pipeline
+
+        -- Convert input to list format if necessary
+        local singleInput = false
         if #taskInput == 0 then
           taskInput = {taskInput}
+          singleInput = true
         end
 
         taskOutput.response = {}
@@ -148,7 +152,8 @@ function Workflow:run(request)
           taskInput[i] = output
         end
 
-        if #taskInput == 1 then
+        -- Convert list to element if necessary
+        if singleInput then
           taskInput = taskInput[1]
           taskOutput.response = taskOutput.response[1]
         end
@@ -157,14 +162,29 @@ function Workflow:run(request)
 			-- Assign final task output to step output
 			stepOutput[label] = taskOutput.response
 
+      -- Convert to list for processing
+      local singleOutput = false
+      if #stepOutput[label] == 0 then
+        stepOutput[label] = {stepOutput[label]}
+        singleOutput = true
+      end
+
       -- If there are any step output filters, apply them
       if step["filters"] then
-        local filteredOutput = {}
-        for i, filter in pairs(step["filters"]) do
-          filteredOutput[filter] = stepOutput[label][filter]
-        end
+        for i, output in ipairs(stepOutput[label]) do
+          local filteredOutput = {}
 
-        stepOutput[label] = filteredOutput
+          for j, filter in pairs(step["filters"]) do
+            filteredOutput[filter] = stepOutput[label][i][filter]
+          end
+
+          stepOutput[label][i] = filteredOutput
+        end
+      end
+
+      -- Convert list to element if necessary
+      if singleOutput then
+        stepOutput[label] = stepOutput[label][1]
       end
 
 			exitCode = taskOutput.code
