@@ -91,6 +91,11 @@ function Service:request(parameters)
 	-- Set default parameters if argument is missing
 	parameters = parameters or {}
 
+  -- Clear all client request headers before the proxy request
+  for header, value in pairs(ngx.req.get_headers()) do
+    ngx.req.clear_header(header)
+  end
+
 	-- Set subrequest headers
 	for header, value in pairs(parameters.headers or {}) do
     ngx.req.set_header(header, value)
