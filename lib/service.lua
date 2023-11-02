@@ -34,6 +34,7 @@ function Service:new(instance, name)
 
 	if services[name] then
 		instance.path = "/"..services[name].path
+    instance.external = services[name].external
 	else
 		error({code=500, error="Requested service '"..name.."' does not exist."})
 	end
@@ -91,9 +92,11 @@ function Service:request(parameters)
 	-- Set default parameters if argument is missing
 	parameters = parameters or {}
 
-  -- Clear all client request headers before the proxy request
-  for header, value in pairs(ngx.req.get_headers()) do
-    ngx.req.clear_header(header)
+  -- Clear all client request headers before an external proxy request
+  if self.external then
+    for header, value in pairs(ngx.req.get_headers()) do
+      ngx.req.clear_header(header)
+    end
   end
 
 	-- Set subrequest headers
