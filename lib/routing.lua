@@ -19,7 +19,10 @@ local Workflow = require "moko.workflow".Workflow
 local join = require "moko.utilities".join
 local pcall = pcall
 local type = type
-    
+
+-- Formatting options
+cjson.encode_empty_table_as_object(false)
+
 -- Encapsulate package
 setfenv(1, package)
 

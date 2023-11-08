@@ -164,7 +164,9 @@ function Workflow:run(request)
 
       -- Convert to list for processing
       local singleOutput = false
-      if #stepOutput[label] == 0 then
+      if stepOutput[label] == nil then
+        stepOutput[label] = {}
+      elseif #stepOutput[label] == 0 then
         stepOutput[label] = {stepOutput[label]}
         singleOutput = true
       end
