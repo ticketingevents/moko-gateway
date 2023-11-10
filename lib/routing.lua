@@ -257,7 +257,7 @@ function Router:runWorkflow(label, request, router)
 		-- The workflow couldn't be found
 		ngx.status = 500
 		router:json({error="There was a server error while excuting this request. Please see system logs for details."})
-		ngx.log(ngx.ERR, "Can't find tye '"..label.."' workflow specified for endpoint: "..ngx.var.uri)
+		ngx.log(ngx.ERR, "Can't find the '"..label.."' workflow specified for endpoint: "..ngx.var.uri)
 
     return {false, nil}
 	end
