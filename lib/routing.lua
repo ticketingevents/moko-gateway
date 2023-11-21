@@ -89,6 +89,8 @@ function Router:initialise()
 	self.route(
 		function(router)
 			local error = "The requested endpoint ".. ngx.var.uri .." does not exist on this server."
+
+      ngx.status = ngx.HTTP_NOT_FOUND
 			router:json({message = error})
 		end
 	)
