@@ -71,6 +71,16 @@ function Service:put(endpoint, args, headers, payload)
 	})
 end
 
+function Service:patch(endpoint, args, headers, payload)
+  return self:request({
+    method=ngx.HTTP_PATCH,
+    endpoint=endpoint,
+    args=args,
+    headers=headers,
+    body=payload
+  })
+end
+
 function Service:delete(endpoint, args, headers)
 	return self:request({
 		method=ngx.HTTP_DELETE,
