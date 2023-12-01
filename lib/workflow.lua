@@ -14,6 +14,7 @@ local error = error
 local pcall = pcall
 local ngx = ngx
 local next = next
+local type = type
 local gmatch  = string.gmatch
 local unpack  = table.unpack
 local join = require "moko.utilities".join
@@ -131,9 +132,9 @@ function Workflow:run(request)
 
   				-- Pipe task output to next task in pipeline
 
-          -- Convert input to list format if necessary
+          -- Convert input to list format if necessary (except for pipeline input)
           local singleInput = false
-          if #taskInput == 0 then
+          if #taskInput == 0 and (next(taskInput) ~= nil or i == 1) then
             taskInput = {taskInput}
             singleInput = true
           end

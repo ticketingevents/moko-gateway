@@ -250,7 +250,33 @@ function Router:runWorkflow(label, request, router)
 
 		-- Add workflow steps
 		for i, step in pairs(self.workflows[label].steps) do
-			workflow:add_step(step)
+      -- Handle workflow injection steps
+      if step.inject ~= nil then
+        -- Load injected workflow
+        local injected_workflow = self.workflows[step.inject.workflow]
+
+        -- Add injected steps to workflow
+        for j, injected_step in pairs(injected_workflow.steps) do
+          -- Create substitute step
+          local new_step = {
+            data={},
+            pipelines=injected_step.pipelines
+          }
+
+          -- Map injected workflow data
+          for field, value in pairs(injected_step.data) do
+            new_step.data[field] = injected_step.data[field]
+            if value == "inject" then
+              new_step.data[field] = step.inject.data[field]
+            end
+          end
+          
+          -- Inject step to workflow
+          workflow:add_step(new_step)
+        end
+      else
+        workflow:add_step(step)
+      end
 		end
 
 		-- Run workflow
