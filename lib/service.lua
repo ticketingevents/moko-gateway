@@ -20,6 +20,7 @@ setfenv(1, package)
 
 -- Define Service Class
 Service = {}
+cache = {}
 
 function Service:new(instance, name)
 	instance = instance or {}
@@ -35,6 +36,7 @@ function Service:new(instance, name)
 	if services[name] then
 		instance.path = "/"..services[name].path
     instance.external = services[name].external
+    instance.cache = cache
 	else
 		error({code=500, error="Requested service '"..name.."' does not exist."})
 	end
@@ -43,12 +45,35 @@ function Service:new(instance, name)
 end
 
 function Service:get(endpoint, args, headers)
-	return self:request({
-		method=ngx.HTTP_GET,
-		endpoint=endpoint,
-		args=args,
-		headers=headers
-	})
+  -- Create request signature
+  local signature = ""
+  signature = signature .. endpoint
+
+  if args ~= nil then
+    for key, value in pairs(args) do
+      signature = signature .. key .. value
+    end
+  end
+
+  if headers ~= nil then
+    for header, value in pairs(headers) do
+      signature = signature .. header .. value
+    end
+  end
+
+  signature = ngx.encode_base64(signature)
+
+  -- Check if request exists in cache
+  if self.cache[signature] == nil then
+  	self.cache[signature] = self:request({
+  		method=ngx.HTTP_GET,
+  		endpoint=endpoint,
+  		args=args,
+  		headers=headers
+  	})
+  end
+
+  return self.cache[signature]
 end
 
 function Service:post(endpoint, args, headers, payload)
