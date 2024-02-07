@@ -19,6 +19,7 @@ local Workflow = require "moko.workflow".Workflow
 local join = require "moko.utilities".join
 local pcall = pcall
 local type = type
+local Cache = require "moko.cache".Cache
 
 -- Formatting options
 cjson.encode_empty_table_as_object(false)
@@ -292,6 +293,10 @@ function Router:runWorkflow(label, request, router)
 end
 
 function Router:dispatch()
+  -- Clear cache for each route
+  local cache = Cache:new()
+  cache:clear()
+
 	self.route :dispatch()
 end
 

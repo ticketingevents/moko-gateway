@@ -14,13 +14,13 @@ local error = error
 local pairs = pairs
 local yaml = require "yaml"
 local cjson = require "cjson.safe"
+local Cache = require "moko.cache".Cache
     
 -- Encapsulate package
 setfenv(1, package)
 
 -- Define Service Class
 Service = {}
-cache = {}
 
 function Service:new(instance, name)
 	instance = instance or {}
@@ -36,7 +36,7 @@ function Service:new(instance, name)
 	if services[name] then
 		instance.path = "/"..services[name].path
     instance.external = services[name].external
-    instance.cache = cache
+    instance.cache = Cache:new()
 	else
 		error({code=500, error="Requested service '"..name.."' does not exist."})
 	end
@@ -64,16 +64,16 @@ function Service:get(endpoint, args, headers)
   signature = ngx.encode_base64(signature)
 
   -- Check if request exists in cache
-  if self.cache[signature] == nil then
-  	self.cache[signature] = self:request({
+  if not self.cache:retrieve(signature) then
+  	self.cache:insert(signature, self:request({
   		method=ngx.HTTP_GET,
   		endpoint=endpoint,
   		args=args,
   		headers=headers
-  	})
+  	}))
   end
 
-  return self.cache[signature]
+  return self.cache:retrieve(signature)
 end
 
 function Service:post(endpoint, args, headers, payload)
