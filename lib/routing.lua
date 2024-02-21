@@ -261,7 +261,9 @@ function Router:runWorkflow(label, request, router)
           -- Create substitute step
           local new_step = {
             data={},
-            pipelines=injected_step.pipelines
+            pipelines=injected_step.pipelines,
+            conditions=injected_step.conditions,
+            filters=injected_step.filters
           }
 
           -- Map injected workflow data
