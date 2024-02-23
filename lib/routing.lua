@@ -142,6 +142,7 @@ function Router:buildRequest(uri, arg)
 	-- Build request object for workflow input
 	local request = {
 		uri = {},
+		method = ngx.req.get_method(),
 		headers = ngx.req.get_headers(),
 		query = ngx.req.get_uri_args(),
 		body = cjson.decode(ngx.req.get_body_data())
