@@ -179,6 +179,7 @@ function Router:buildHandler(method, endpoint)
 				if output.code > 299 then
 					ngx.status = output.code
 					router:json(output.response)
+
 					return
 				end
 			else
@@ -236,7 +237,13 @@ function Router:buildHandler(method, endpoint)
 		-- Report success or error as necessary
 		if success then
 			ngx.status = output.code
-			router:json(output.response)
+
+			if output.format == "application/json" then
+				router:json(output.response)
+			else
+				ngx.header["Content-Type"] = output.format;
+				ngx.say(output.response.data)
+			end
 		else
 			self:logError(router, output)
 		end

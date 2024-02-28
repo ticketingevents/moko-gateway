@@ -105,12 +105,12 @@ function Workflow:run(request)
   			end
 
   			-- Iterate through pipeline's tasks
-  			local taskOutput = {code=0, response={}}
+  			local taskOutput = {code=0, format="application/json", response={}}
   			local task = {}
 
   			for i, name in pairs(pipeline["tasks"]) do
   				-- Clear task output
-  				taskOutput = {code=0, response={}}
+  				taskOutput = {code=0, format="application/json", response={}}
 
   				-- Attempt to load task from user space
   				success, TaskClass = pcall(require, "moko.tasks.user."..name)
@@ -154,6 +154,7 @@ function Workflow:run(request)
               taskOutput.code = output.code
             end
 
+            taskOutput.format = output.format
             taskOutput.response[i] = output.response
           end
 
@@ -201,6 +202,7 @@ function Workflow:run(request)
         end
 
   			exitCode = taskOutput.code
+        responseFormat = taskOutput.format
   		end
 
   		-- If there was no step output pass-through input
@@ -223,7 +225,7 @@ function Workflow:run(request)
 		end
 	end
 
-	return {code=exitCode, response=workflowOutput}
+	return {code=exitCode, format=responseFormat, response=workflowOutput}
 end
 
 function Workflow:parseInput(input, step)

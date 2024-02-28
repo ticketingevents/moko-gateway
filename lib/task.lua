@@ -29,15 +29,15 @@ function Task:buildService(name)
 end
 
 function Task:ok(payload)
-	return self:respond(ngx.HTTP_OK, payload)
+	return self:respond(ngx.HTTP_OK, payload, "application/json")
 end
 
 function Task:created(payload)
-	return self:respond(ngx.HTTP_CREATED, payload)
+	return self:respond(ngx.HTTP_CREATED, payload, "application/json")
 end
 
 function Task:noContent()
-	return self:respond(ngx.HTTP_NO_CONTENT, {})
+	return self:respond(ngx.HTTP_NO_CONTENT, {}, "application/json")
 end
 
 function Task:bad(message)
@@ -88,8 +88,8 @@ function Task:tooManyRequests(message)
 	return self:fail(ngx.HTTP_TOO_MANY_REQUESTS, message)
 end
 
-function Task:respond(code, payload)
-	return {code=code, response=payload}
+function Task:respond(code, payload, format)
+	return {code=code, response=payload, format=format}
 end
 
 function Task:fail(code, message)
