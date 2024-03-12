@@ -32,6 +32,10 @@ WORKDIR project
 RUN mkdir conf tasks
 RUN touch conf/endpoints.yaml conf/services.yaml
 
-CMD ["/home/moko/bin/moko_entrypoint.sh"]
+# Define Healthcheck
+HEALTHCHECK --interval=5s --timeout=5s --retries=6 \
+  CMD ps auxf | grep "[o]penresty -g daemon off" | wc -l
+
+ENTRYPOINT ["/home/moko/bin/moko_entrypoint.sh"]
 
 STOPSIGNAL SIGQUIT
