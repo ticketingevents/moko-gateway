@@ -1,7 +1,7 @@
 FROM openresty/openresty:1.21.4.1-0-jammy
 
 # Set default service resolver
-ENV SERVICE_DNS 127.0.0.11
+ENV SERVICE_DNS=127.0.0.11
 
 # Install python and libraries
 RUN apt install -y python3 python3-pip

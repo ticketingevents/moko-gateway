@@ -6,5 +6,5 @@ location /${SERVICE_PATH}/ {
 	resolver ${SERVICE_DNS};
 	deny all;
 
-	proxy_pass ${SERVICE_URL}/${DOLLAR}1${DOLLAR}is_args${DOLLAR}args;
+	proxy_pass http://${SERVICE_URL}.${SERVICE_DOMAIN}/${DOLLAR}1${DOLLAR}is_args${DOLLAR}args;
 }
