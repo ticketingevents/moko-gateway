@@ -16,7 +16,9 @@ jobs:
           command: docker build -t ticketingevents/moko-gateway:$CIRCLE_TAG -t ticketingevents/moko-gateway:latest .
       - run:
           name: Publish Mogo Gateway base image to Docker Hub
-          command: docker push ticketingevents/moko-gateway:$CIRCLE_TAG ticketingevents/moko-gateway:latest
+          command: |
+            docker push ticketingevents/moko-gateway:$CIRCLE_TAG
+            docker push ticketingevents/moko-gateway:latest
 
 workflows:
   publish_to_docker:
@@ -26,6 +28,6 @@ workflows:
             - Build Secrets 
           filters:
             tags:
-              only: /v[0-9]+(\.[0-9]+)*/
+              only: /[0-9]+(\.[0-9]+)*/
             branches:
               ignore: /.*/
