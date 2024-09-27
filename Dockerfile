@@ -11,7 +11,8 @@ RUN pip install pyyaml
 
 # Install third-party openresty libraries
 RUN opm get DevonStrawn/lua-resty-route
-RUN /usr/local/openresty/luajit/bin/luarocks install lua-yaml
+RUN luarocks install lua-yaml
+RUN luarocks install luasocket
 
 # Install Moko Gateway library
 COPY ./lib /usr/local/openresty/site/lualib/moko

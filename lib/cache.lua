@@ -1,6 +1,6 @@
 local package = {}
 if _REQUIREDNAME == nil then
-  task = package
+  cache = package
 else
   _G[_REQUIREDNAME] = package
 end

@@ -9,6 +9,7 @@ end
 local require = require
 local setmetatable = setmetatable
 local ngx = ngx
+local os = os
 local io = io
 local string = string
 local cjson = require "cjson.safe"
@@ -20,6 +21,7 @@ local join = require "moko.utilities".join
 local pcall = pcall
 local type = type
 local Cache = require "moko.cache".Cache
+local Profiler = require "moko.profiler".Profiler
 
 -- Formatting options
 cjson.encode_empty_table_as_object(false)
@@ -234,6 +236,15 @@ function Router:buildHandler(method, endpoint)
 		-- Execute main endpoint workflow
 		local success, output = self:runWorkflow(method.workflow, request, router)
 		
+	  -- Print profiling information (if enabled)
+		local profiler = Profiler:new()
+		if os.getenv("PROFILING") == "on" and ngx.req.get_uri_args()["profile"] ~= nil then
+		  profiler:report()
+		end
+
+		-- Reset profiling information
+		profiler:reset()
+
 		-- Report success or error as necessary
 		if success then
 			ngx.status = output.code
@@ -307,7 +318,7 @@ function Router:dispatch()
   local cache = Cache:new()
   cache:clear()
 
-	self.route :dispatch()
+	self.route:dispatch()
 end
 
 function Router:logError(router, error)

@@ -15,6 +15,7 @@ local pairs = pairs
 local yaml = require "yaml"
 local cjson = require "cjson.safe"
 local Cache = require "moko.cache".Cache
+local Profiler = require "moko.profiler".Profiler
     
 -- Encapsulate package
 setfenv(1, package)
@@ -34,9 +35,11 @@ function Service:new(instance, name)
 	services = yaml.eval(serviceDefinitions)["services"]
 
 	if services[name] then
+		instance.name = name
 		instance.path = "/"..services[name].path
     instance.external = services[name].external
     instance.cache = Cache:new()
+    instance.profiler = Profiler:new()
 	else
 		error({code=500, error="Requested service '"..name.."' does not exist."})
 	end
@@ -140,6 +143,12 @@ function Service:request(parameters)
 	end
 
 	-- Make subrequest
+	log = self.profiler:start(
+		self.name,
+		parameters.endpoint or "/",
+		parameters.method or ngx.HTTP_GET
+	)
+
 	response = ngx.location.capture(
 		self.path .. (parameters.endpoint or "/"),
 		{
@@ -148,6 +157,8 @@ function Service:request(parameters)
 			body = cjson.encode(parameters.body) or nil
 		}
 	)
+
+	self.profiler:stop(log)
 
 	-- Return subrequest response
 	return {
