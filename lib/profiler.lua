@@ -68,6 +68,7 @@ function Profiler:report()
     [ngx.HTTP_GET]="GET",
     [ngx.HTTP_POST]="POST",
     [ngx.HTTP_PUT]="PUT",
+    [ngx.HTTP_PATCH]="PATCH",
     [ngx.HTTP_DELETE]="DELETE"
   }
 

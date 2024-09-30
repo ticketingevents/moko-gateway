@@ -4,7 +4,7 @@ FROM openresty/openresty:1.21.4.1-0-jammy
 ENV SERVICE_DNS=127.0.0.11
 
 # Install python and libraries
-RUN apt install -y python3 python3-pip
+RUN apt update -y && apt install -y python3 python3-pip git
 
 # Install python libraries
 RUN pip install pyyaml
@@ -13,12 +13,13 @@ RUN pip install pyyaml
 RUN opm get DevonStrawn/lua-resty-route
 RUN luarocks install lua-yaml
 RUN luarocks install luasocket
+RUN luarocks install lua-resty-mysql
 
 # Install Moko Gateway library
 COPY ./lib /usr/local/openresty/site/lualib/moko
 
 # Copy nginx config
-COPY ./conf/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
+COPY ./conf/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf.template
 COPY ./conf/moko.conf /usr/local/openresty/nginx/sites/moko.conf
 COPY ./conf/service.*.template /usr/local/openresty/nginx/services/
 
