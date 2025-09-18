@@ -4,7 +4,7 @@ if _REQUIREDNAME == nil then
 else
 	_G[_REQUIREDNAME] = package
 end
-    
+		
 -- Import Section
 local require = require
 local setmetatable = setmetatable
@@ -93,7 +93,7 @@ function Router:initialise()
 		function(router)
 			local error = "The requested endpoint ".. ngx.var.uri .." does not exist on this server."
 
-      ngx.status = ngx.HTTP_NOT_FOUND
+			ngx.status = ngx.HTTP_NOT_FOUND
 			router:json({message = error})
 		end
 	)
@@ -131,11 +131,11 @@ function Router:handleCors(endpoint)
 	self.route.filter ("@"..gsub(endpoint.uri, ":%a+", ":string")) (
 		function(router)	
 			ngx.header["Access-Control-Allow-Origin"] = settings.origin or nil;
-	    ngx.header["Access-Control-Allow-Credentials"] = settings.origin and "true";
-	    ngx.header["Access-Control-Allow-Methods"] = join(settings.methods, ", ") or nil;
-	    ngx.header["Access-Control-Allow-Headers"] = join(settings.headers.request, ", ") or nil;
-	    ngx.header["Access-Control-Expose-Headers"] = join(settings.headers.response, ", ") or nil;
-	    ngx.header["Access-Control-Max-Age"] = settings.lifetime or nil;
+			ngx.header["Access-Control-Allow-Credentials"] = settings.origin and "true";
+			ngx.header["Access-Control-Allow-Methods"] = join(settings.methods, ", ") or nil;
+			ngx.header["Access-Control-Allow-Headers"] = join(settings.headers.request, ", ") or nil;
+			ngx.header["Access-Control-Expose-Headers"] = join(settings.headers.response, ", ") or nil;
+			ngx.header["Access-Control-Max-Age"] = settings.lifetime or nil;
 		end
 	)
 end
@@ -173,7 +173,7 @@ function Router:buildHandler(method, endpoint)
 			local success, output = self:runWorkflow(
 				method.guard,
 				request,
-        router
+				router
 			)
 
 			if success then
@@ -195,37 +195,37 @@ function Router:buildHandler(method, endpoint)
 			local authenticated, user = self:runWorkflow(
 				method.restrictions.authenticate,
 				request,
-        router
+				router
 			)
 		
 			if authenticated then
 				-- Check that the authenticated user has access
 				for field, criteria in pairs(method.restrictions.allow) do
-          -- Case criteria to table if necessary
-          if type(criteria) ~= 'table' then
-            criteria = {criteria}
-          end
+					-- Case criteria to table if necessary
+					if type(criteria) ~= 'table' then
+						criteria = {criteria}
+					end
 
-          -- Check that the user matches at least one value for this criteria
-          local matching_criteria = false
+					-- Check that the user matches at least one value for this criteria
+					local matching_criteria = false
 
-          for i, value in pairs(criteria) do
-  					-- Check that user has allowed value
-  					if user.response[field] == value then
-              matching_criteria = true
-  					end
-          end
+					for i, value in pairs(criteria) do
+						-- Check that user has allowed value
+						if user.response[field] == value then
+							matching_criteria = true
+						end
+					end
 
-          -- If the user matches no values for this criteria they don't have access
-          if matching_criteria == false then
-            ngx.status = ngx.HTTP_FORBIDDEN
-            router:json({error="You are restricted from accessing this resource"})
-            return
-          end
+					-- If the user matches no values for this criteria they don't have access
+					if matching_criteria == false then
+						ngx.status = ngx.HTTP_FORBIDDEN
+						router:json({error="You are restricted from accessing this resource"})
+						return
+					end
 				end
 
-        -- If user is authorised assign their details to the request
-        request.user = user.response
+				-- If user is authorised assign their details to the request
+				request.user = user.response
 			else
 					ngx.status = ngx.HTTP_UNAUTHORIZED
 					router:json({error="Your request could not be authenticated."})
@@ -236,10 +236,10 @@ function Router:buildHandler(method, endpoint)
 		-- Execute main endpoint workflow
 		local success, output = self:runWorkflow(method.workflow, request, router)
 		
-	  -- Print profiling information (if enabled)
+		-- Print profiling information (if enabled)
 		local profiler = Profiler:new()
 		if os.getenv("PROFILING") == "on" and ngx.req.get_uri_args()["profile"] ~= nil then
-		  profiler:report()
+			profiler:report()
 		end
 
 		-- Reset profiling information
@@ -270,35 +270,35 @@ function Router:runWorkflow(label, request, router)
 
 		-- Add workflow steps
 		for i, step in pairs(self.workflows[label].steps) do
-      -- Handle workflow injection steps
-      if step.inject ~= nil then
-        -- Load injected workflow
-        local injected_workflow = self.workflows[step.inject.workflow]
+			-- Handle workflow injection steps
+			if step.inject ~= nil then
+				-- Load injected workflow
+				local injected_workflow = self.workflows[step.inject.workflow]
 
-        -- Add injected steps to workflow
-        for j, injected_step in pairs(injected_workflow.steps) do
-          -- Create substitute step
-          local new_step = {
-            data={},
-            pipelines=injected_step.pipelines,
-            conditions=injected_step.conditions,
-            filters=injected_step.filters
-          }
+				-- Add injected steps to workflow
+				for j, injected_step in pairs(injected_workflow.steps) do
+					-- Create substitute step
+					local new_step = {
+						data={},
+						pipelines=injected_step.pipelines,
+						conditions=injected_step.conditions,
+						filters=injected_step.filters
+					}
 
-          -- Map injected workflow data
-          for field, value in pairs(injected_step.data) do
-            new_step.data[field] = injected_step.data[field]
-            if value == "inject" then
-              new_step.data[field] = step.inject.data[field]
-            end
-          end
-          
-          -- Inject step to workflow
-          workflow:add_step(new_step)
-        end
-      else
-        workflow:add_step(step)
-      end
+					-- Map injected workflow data
+					for field, value in pairs(injected_step.data) do
+						new_step.data[field] = injected_step.data[field]
+						if value == "inject" then
+							new_step.data[field] = step.inject.data[field]
+						end
+					end
+					
+					-- Inject step to workflow
+					workflow:add_step(new_step)
+				end
+			else
+				workflow:add_step(step)
+			end
 		end
 
 		-- Run workflow
@@ -309,14 +309,14 @@ function Router:runWorkflow(label, request, router)
 		router:json({error="There was a server error while excuting this request. Please see system logs for details."})
 		ngx.log(ngx.ERR, "Can't find the '"..label.."' workflow specified for endpoint: "..ngx.var.uri)
 
-    return {false, nil}
+		return {false, nil}
 	end
 end
 
 function Router:dispatch()
-  -- Clear cache for each route
-  local cache = Cache:new()
-  cache:clear()
+	-- Clear cache for each route
+	local cache = Cache:new()
+	cache:clear()
 
 	self.route:dispatch()
 end

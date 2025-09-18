@@ -134,7 +134,7 @@ function Workflow:run(request)
 
           -- Convert input to list format if necessary (except for pipeline input)
           local singleInput = false
-          if #taskInput == 0 and (next(taskInput) ~= nil or i == 1) then
+          if (#taskInput == 0 and (next(taskInput) ~= nil or i == 1)) or name == "merge" then
             taskInput = {taskInput}
             singleInput = true
           end

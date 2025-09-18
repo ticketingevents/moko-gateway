@@ -1,4 +1,4 @@
-FROM openresty/openresty:1.21.4.1-0-jammy
+FROM openresty/openresty:1.27.1.2-4-jammy
 
 # Set default service resolver
 ENV SERVICE_DNS=127.0.0.11
