@@ -265,6 +265,7 @@ function Service:publish(parameters)
 
 	cjson.encode_empty_table_as_object(true)
 	local body = cjson.encode(parameters.message)
+	cjson.encode_empty_table_as_object(false)
 
 	local send_ok, send_error = rabbitmq_connection:send(
 		body,
