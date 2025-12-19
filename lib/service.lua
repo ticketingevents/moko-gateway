@@ -13,12 +13,13 @@ local string = string
 local error = error
 local pairs = pairs
 local os = os
+local math = math
+local tostring = tostring
 local yaml = require "yaml"
 local cjson = require "cjson.safe"
 local Cache = require "moko.cache".Cache
 local Profiler = require "moko.profiler".Profiler
 local rabbitmq = require "resty.rabbitmqstomp"
-local uuid = require 'resty.jit-uuid'
     
 -- Encapsulate package
 setfenv(1, package)
@@ -48,9 +49,6 @@ function Service:new(instance, name)
 	else
 		error({code=500, error="Requested service '"..name.."' does not exist."})
 	end
-
-	-- Seed UUID generator
-	uuid.seed()
 
 	return instance
 end
@@ -213,7 +211,7 @@ function Service:publish(parameters)
 	end
 
 	-- Set RabbitMQ Connection Timeout
-	rabbitmq_connection:set_timeout(10000)
+	rabbitmq_connection:set_timeout(30000)
 
 	-- Connect to RabbitMQ over STOMP
 	local connection_ok, connection_error = rabbitmq_connection:connect(
@@ -230,8 +228,11 @@ function Service:publish(parameters)
 		})
 	end
 
+	-- Seed random number
+	math.randomseed(os.time() + os.clock())
+
 	-- Setup message response consumer
-	local subscription_id = uuid.generate_v4()
+	local subscription_id = tostring(math.random(1000000, 9999999))
 	local response_queue = "gateway-"..subscription_id
 	local subscription_ok, subscription_error = rabbitmq_connection:subscribe({
 		id=subscription_id,
@@ -259,7 +260,7 @@ function Service:publish(parameters)
 	}
 
 	-- Generate correlation ID
-	local correlation_id = uuid.generate_v4()
+	local correlation_id = tostring(math.random(1000000, 9999999))
 	parameters.message["reply_to"] = response_queue
 	parameters.message["correlation_id"] = correlation_id
 
@@ -284,7 +285,8 @@ function Service:publish(parameters)
 	-- Wait for a response from the service
 	local response = nil
 
-	while not response and os.time() do
+	start = os.time()
+	while not response and (os.time() - start) < 30 do
 		data, receipt_error = rabbitmq_connection:receive()
 
 

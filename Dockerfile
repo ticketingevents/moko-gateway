@@ -15,7 +15,6 @@ RUN luarocks install lua-resty-rabbitmqstomp
 RUN luarocks install lua-yaml
 RUN luarocks install luasocket
 RUN luarocks install lua-resty-mysql
-RUN luarocks install lua-resty-jit-uuid
 
 # Install Moko Gateway library
 COPY ./lib /usr/local/openresty/site/lualib/moko
