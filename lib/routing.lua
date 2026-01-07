@@ -227,8 +227,7 @@ function Router:buildHandler(method, endpoint)
 				-- If user is authorised assign their details to the request
 				request.user = user.response
 			else
-					ngx.status = ngx.HTTP_UNAUTHORIZED
-					router:json({error="Your request could not be authenticated."})
+					self:logError(router, user)
 					return
 			end
 		end

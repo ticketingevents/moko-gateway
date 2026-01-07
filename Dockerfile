@@ -14,7 +14,6 @@ RUN opm get DevonStrawn/lua-resty-route
 RUN luarocks install lua-resty-rabbitmqstomp
 RUN luarocks install lua-yaml
 RUN luarocks install luasocket
-RUN luarocks install lua-resty-mysql
 
 # Install Moko Gateway library
 COPY ./lib /usr/local/openresty/site/lualib/moko

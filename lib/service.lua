@@ -178,6 +178,15 @@ end
 
 --############################# Event-Based Model #################@
 
+function Service:call(resource, action, message)
+	return self:publish({
+		exchange=self.name,
+		resource=resource,
+		action=action,
+		message=message
+	})
+end
+
 function Service:migrate()
 	return self:publish({
 		exchange="database",
