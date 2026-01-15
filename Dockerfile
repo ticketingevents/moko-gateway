@@ -4,7 +4,7 @@ FROM openresty/openresty:1.27.1.2-4-jammy
 ENV SERVICE_DNS=127.0.0.11
 
 # Install python and libraries
-RUN apt update -y && apt install -y python3 python3-pip git
+RUN apt update -y && apt install -y python3 python3-pip git libpcre3 libpcre3-dev
 
 # Install python libraries
 RUN pip install pyyaml
@@ -14,6 +14,9 @@ RUN opm get DevonStrawn/lua-resty-route
 RUN luarocks install lua-resty-rabbitmqstomp
 RUN luarocks install lua-yaml
 RUN luarocks install luasocket
+RUN luarocks install net-url
+RUN luarocks install lrexlib-pcre
+RUN luarocks install jsonschema
 
 # Install Moko Gateway library
 COPY ./lib /usr/local/openresty/site/lualib/moko

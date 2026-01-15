@@ -1,8 +1,8 @@
 local package = {}
 if _REQUIREDNAME == nil then
-	workflow = package
+  workflow = package
 else
-	_G[_REQUIREDNAME] = package
+  _G[_REQUIREDNAME] = package
 end
     
 -- Import Section
@@ -27,31 +27,31 @@ setfenv(1, package)
 Workflow = {}
 
 function Workflow:new(instance)
-	instance = instance or {}
-	setmetatable(instance, self)
+  instance = instance or {}
+  setmetatable(instance, self)
 
-	self.__index = self
-	instance.steps = {}
+  self.__index = self
+  instance.steps = {}
 
-	return instance
+  return instance
 end
 
 function Workflow:add_step(step)
-	-- Add workflow step
-	self.steps[#self.steps+1] = step
+  -- Add workflow step
+  self.steps[#self.steps+1] = step
 end
 
 function Workflow:run(request)
   local stepInput = {}
-	local stepOutput = {}
-	local exitCode = 0
+  local stepOutput = {}
+  local exitCode = 0
 
-	for i, step in ipairs(self.steps) do
-		-- Reset step output
-		stepOutput = {}
+  for i, step in ipairs(self.steps) do
+    -- Reset step output
+    stepOutput = {}
 
-		-- Parse step input values for pipeline input
-		local pipelineRequestInput, missingRequestInput = self:parseInput(request, step)
+    -- Parse step input values for pipeline input
+    local pipelineRequestInput, missingRequestInput = self:parseInput(request, step)
 
     -- Parse request values for pipeline input
     local pipelineStepInput, missingStepInput = self:parseInput(stepInput, step)
@@ -94,43 +94,43 @@ function Workflow:run(request)
     end
 
     if conditions_met then
-  		-- Execute Pipelines
-  		for label, pipeline in pairs(step["pipelines"]) do
-  			-- Prepare task input
-  			local taskInput = {}
+      -- Execute Pipelines
+      for label, pipeline in pairs(step["pipelines"]) do
+        -- Prepare task input
+        local taskInput = {}
 
-  			-- Filter out pipeline input for requested fields
-  			for i, field in pairs(pipeline["input"]) do
-  				taskInput[field] = pipelineInput[field]
-  			end
+        -- Filter out pipeline input for requested fields
+        for i, field in pairs(pipeline["input"]) do
+          taskInput[field] = pipelineInput[field]
+        end
 
-  			-- Iterate through pipeline's tasks
-  			local taskOutput = {code=0, format="application/json", response={}}
-  			local task = {}
+        -- Iterate through pipeline's tasks
+        local taskOutput = {code=0, format="application/json", response={}}
+        local task = {}
 
-  			for i, name in pairs(pipeline["tasks"]) do
-  				-- Clear task output
-  				taskOutput = {code=0, format="application/json", response={}}
+        for i, name in pairs(pipeline["tasks"]) do
+          -- Clear task output
+          taskOutput = {code=0, format="application/json", response={}}
 
-  				-- Attempt to load task from user space
-  				success, TaskClass = pcall(require, "moko.tasks.user."..name)
-  				if not success then
+          -- Attempt to load task from user space
+          success, TaskClass = pcall(require, "moko.tasks.user."..name)
+          if not success then
             local error_message = TaskClass
 
-  					-- Attempt to load system task
-  					success, TaskClass = pcall(require, "moko.tasks.system."..name)
+            -- Attempt to load system task
+            success, TaskClass = pcall(require, "moko.tasks.system."..name)
 
-  					-- If no matching task was found
-  					if not success then
+            -- If no matching task was found
+            if not success then
               ngx.log(ngx.ERR, error_message)
-  						error({code=404, error="Task "..name.." is not defined."})
-  					end
-  				end
+              error({code=404, error="Task "..name.." is not defined."})
+            end
+          end
 
-  				-- Create instance of the task
-  				task = TaskClass:new()
+          -- Create instance of the task
+          task = TaskClass:new()
 
-  				-- Pipe task output to next task in pipeline
+          -- Pipe task output to next task in pipeline
 
           -- Convert input to list format if necessary (except for pipeline input)
           local singleInput = false
@@ -169,10 +169,10 @@ function Workflow:run(request)
             taskInput = taskInput[1]
             taskOutput.response = taskOutput.response[1]
           end
-  			end
+        end
 
-  			-- Assign final task output to step output
-  			stepOutput[label] = taskOutput.response
+        -- Assign final task output to step output
+        stepOutput[label] = taskOutput.response
 
         -- Convert to list for processing
         local singleOutput = false
@@ -201,31 +201,31 @@ function Workflow:run(request)
           stepOutput[label] = stepOutput[label][1]
         end
 
-  			exitCode = taskOutput.code
+        exitCode = taskOutput.code
         responseFormat = taskOutput.format
-  		end
+      end
 
-  		-- If there was no step output pass-through input
-  		if next(stepOutput) == nil then
-  			stepOutput["pass"] = pipelineInput
-  		end
+      -- If there was no step output pass-through input
+      if next(stepOutput) == nil then
+        stepOutput["pass"] = pipelineInput
+      end
 
-  		-- Pipe step output into the subsequent step
-  		stepInput = stepOutput
+      -- Pipe step output into the subsequent step
+      stepInput = stepOutput
     else
       stepOutput = stepInput
     end
-	end
+  end
 
-	-- Simple aggregation of last step pipeline outputs
-	local workflowOutput = {}
-	for pipeline, output in pairs(stepOutput) do
-		for key, value in pairs(output) do
-			workflowOutput[key] = value
-		end
-	end
+  -- Simple aggregation of last step pipeline outputs
+  local workflowOutput = {}
+  for pipeline, output in pairs(stepOutput) do
+    for key, value in pairs(output) do
+      workflowOutput[key] = value
+    end
+  end
 
-	return {code=exitCode, format=responseFormat, response=workflowOutput}
+  return {code=exitCode, format=responseFormat, response=workflowOutput}
 end
 
 function Workflow:parseInput(input, step)
