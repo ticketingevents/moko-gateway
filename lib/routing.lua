@@ -67,32 +67,34 @@ end
 function Router:initialise()
     -- Add endpoint routes
     for endpoint, methods in pairs(self.endpoints) do
-        -- Initialise methods table with defaults
-        local definitions = {}
-        for method, definition in pairs(self.defaults.methods) do
-            definitions[method] = {
-                workflow = definition.workflow or nil,
-                guard = definition.guard or nil
-            }
-        end
+        -- Setup method definitions from declaration
+        local definitions = {
+            get = {},
+            post = {},
+            put = {},
+            patch = {},
+            delete = {},
+            options = {}
+        }
 
-        -- Override default methods with user definitions
         for method, definition in pairs(methods) do
-            definitions[method].workflow = definition.workflow or definitions[method].workflow
-            definitions[method].access = definition.access or cjson.decode(definitions[method].access)
+            if definitions[method] then
+                definitions[method].workflow = definition.workflow or definitions[method].workflow
+                definitions[method].access = definition.access or cjson.decode(definitions[method].access)
 
-            -- Compile and cache parameters schema validator if one is specified
-            if definition.parameters then
-                definitions[method].parameter_validator = jsonschema.generate_validator(
-                    self:parse_schema(definition.parameters)
-                )
-            end
+                -- Compile and cache parameters schema validator if one is specified
+                if definition.parameters then
+                    definitions[method].parameter_validator = jsonschema.generate_validator(
+                        self:parse_schema(definition.parameters)
+                    )
+                end
 
-            -- Compile and cache request schema validator if one is specified
-            if definition.request then
-                definitions[method].request_validator = jsonschema.generate_validator(
-                    self:parse_schema(definition.request)
-                )
+                -- Compile and cache request schema validator if one is specified
+                if definition.request then
+                    definitions[method].request_validator = jsonschema.generate_validator(
+                        self:parse_schema(definition.request)
+                    )
+                end
             end
         end
         
@@ -101,7 +103,7 @@ function Router:initialise()
             self.route(
                 method,
                 "@"..gsub(endpoint, ":%a+", ":string"),
-                self:buildHandler(endpoint, definition)
+                self:buildHandler(endpoint, method, definition)
             )
         end
     end
@@ -167,13 +169,31 @@ function Router:buildRequest(uri, arg)
     return request
 end
 
-function Router:buildHandler(endpoint, method)
-    -- Handle CORS if settings are provided
+function Router:buildHandler(endpoint, method, definition)
+    -- Add CORS headers if settings are provided
     self:handleCors(endpoint)
 
     return function(router, ...)
+        -- Handle OPTIONS requests
+        if method == "options" then
+            ngx.status = ngx.HTTP_NO_CONTENT
+            router:json({})
+
+            return
+        end
+
+        -- Handle unsupported methods
+        if not definition.workflow then
+            ngx.status = ngx.HTTP_NOT_ALLOWED
+            router:json({
+                error="The "..endpoint.." endpoint does not support the "..string.upper(method).." method"
+            })
+
+            return
+        end
+
         -- Validate parameters before proceeding
-        if method.request_validator ~= nil then
+        if definition.request_validator ~= nil then
             local parameters = {}
             for parameter, value in pairs(ngx.req.get_uri_args()) do
                 if tonumber(value) ~= nil then
@@ -185,7 +205,7 @@ function Router:buildHandler(endpoint, method)
                 end
             end
             
-            ok, error = method.parameter_validator(parameters)
+            ok, error = definition.parameter_validator(parameters)
             if not ok then
                 ngx.log(ngx.ERR, error)
                 ngx.status = ngx.HTTP_BAD_REQUEST
@@ -200,10 +220,10 @@ function Router:buildHandler(endpoint, method)
         end
 
         -- Validate request body before proceeding
-        if method.request_validator ~= nil then
+        if definition.request_validator ~= nil then
             local body = cjson.decode(ngx.req.get_body_data())
             
-            ok, error = method.request_validator(body)
+            ok, error = definition.request_validator(body)
             if not ok then
                 ngx.log(ngx.ERR, error)
                 ngx.status = ngx.HTTP_BAD_REQUEST
@@ -220,28 +240,6 @@ function Router:buildHandler(endpoint, method)
         -- Assemble request to input to workflows
         local request = self:buildRequest(endpoint, {...})
 
-        -- Run guard workflow to determine if route can be run
-        if method.guard then
-            local success, output = self:runWorkflow(
-                method.guard,
-                request,
-                router
-            )
-
-            if success then
-                -- Block request if the workflow returned an error code
-                if output.code > 299 then
-                    ngx.status = output.code
-                    router:json(output.response)
-
-                    return
-                end
-            else
-                self:logError(router, output)
-                return
-            end
-        end
-
         -- If endpoint is restricted run authentication workflow
         if self.authentication then
             local authenticated, access = self:runWorkflow(
@@ -253,7 +251,7 @@ function Router:buildHandler(endpoint, method)
             if authenticated then
                 -- Check that the return access matches the defined access requirements
                 local has_access = false
-                for i, permission in ipairs(method.access) do
+                for i, permission in ipairs(definition.access) do
                     has_access = has_access or (access.response[self.authentication.access] == permission)
                 end
 
@@ -272,7 +270,7 @@ function Router:buildHandler(endpoint, method)
         end
 
         -- Execute main endpoint workflow
-        local success, output = self:runWorkflow(method.workflow, request, router)
+        local success, output = self:runWorkflow(definition.workflow, request, router)
         
         -- Print profiling information (if enabled)
         local profiler = Profiler:new()
@@ -317,17 +315,19 @@ function Router:runWorkflow(label, request, router)
                 for j, injected_step in pairs(injected_workflow.steps) do
                     -- Create substitute step
                     local new_step = {
-                        data={},
-                        pipelines=injected_step.pipelines,
+                        name=injected_step.name,
+                        input={},
+                        persist=injected_step.persist,
+                        tasks=injected_step.tasks,
                         conditions=injected_step.conditions,
                         filters=injected_step.filters
                     }
 
                     -- Map injected workflow data
-                    for field, value in pairs(injected_step.data) do
-                        new_step.data[field] = injected_step.data[field]
+                    for field, value in pairs(injected_step.input) do
+                        new_step.input[field] = injected_step.input[field]
                         if value == "inject" then
-                            new_step.data[field] = step.inject.data[field]
+                            new_step.input[field] = step.inject.input[field]
                         end
                     end
                     

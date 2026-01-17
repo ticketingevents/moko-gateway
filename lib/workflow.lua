@@ -42,198 +42,167 @@ function Workflow:add_step(step)
 end
 
 function Workflow:run(request)
-  local stepInput = {}
-  local stepOutput = {}
   local exitCode = 0
+  local workspace = {}
+  local workflowOutput = {}
 
   for i, step in ipairs(self.steps) do
-    -- Reset step output
-    stepOutput = {}
+    local stepInput = {}
 
-    -- Parse step input values for pipeline input
-    local pipelineRequestInput, missingRequestInput = self:parseInput(request, step)
+    if step.input then
+      -- Parse request values for step input
+      local stepRequestInput, missingRequestInput = self:parseInput(request, step.input)
 
-    -- Parse request values for pipeline input
-    local pipelineStepInput, missingStepInput = self:parseInput(stepInput, step)
-
-    -- Check if any input could not be found from either source
-    local missingInput = {}
-    for i, field in ipairs(missingRequestInput) do
-      if missingStepInput[field] ~= nil then
-        missingInput[#missingInput+1] = field
+      -- Parse workspace values for step input
+      local stepWorkspaceInput, missingWorkspaceInput = self:parseInput(workspace, step.input)
+    
+      -- Check if any input could not be found from either source
+      local missingInput = {}
+      for i, field in ipairs(missingRequestInput) do
+        if missingWorkspaceInput[field] ~= nil then
+          missingInput[#missingInput+1] = field
+        end
       end
-    end
 
-    if #missingInput > 0 then
-      error({
-        code=400,
-        error="Missing required request data: "..join(missingInput)
-      })
+      if #missingInput > 0 then
+        error({
+          code=400,
+          error="Missing required request data: "..join(missingInput)
+        })
 
-      return
-    end
+        return
+      end
 
-    -- Merge input sources
-    local pipelineInput = {}
+      -- Merge input sources
+      for field, value in pairs(stepRequestInput) do
+        stepInput[field] = value
+      end
 
-    for field, value in pairs(pipelineRequestInput) do
-      pipelineInput[field] = value
-    end
-
-    for field, value in pairs(pipelineStepInput) do
-      pipelineInput[field] = value
+      for field, value in pairs(stepWorkspaceInput) do
+        stepInput[field] = value
+      end
     end
 
     -- Check if conditions for the step are met
     local conditions_met = true
 
-    if step["conditions"] then
-      for field, value in pairs(step["conditions"]) do
-        conditions_met = conditions_met and (pipelineInput[field] == value)
+    if step.conditions then
+      for field, value in pairs(step.conditions) do
+        conditions_met = conditions_met and (stepInput[field] == value)
       end
     end
 
+    -- Execute Step
     if conditions_met then
-      -- Execute Pipelines
-      for label, pipeline in pairs(step["pipelines"]) do
-        -- Prepare task input
-        local taskInput = {}
+      -- Iterate through tasks
+      local taskInput = stepInput
+      local taskOutput = {code=0, format="application/json", response={}}
+      local task = {}
 
-        -- Filter out pipeline input for requested fields
-        for i, field in pairs(pipeline["input"]) do
-          taskInput[field] = pipelineInput[field]
-        end
+      for i, name in pairs(step.tasks) do
+        -- Clear task output
+        taskOutput = {code=0, format="application/json", response={}}
 
-        -- Iterate through pipeline's tasks
-        local taskOutput = {code=0, format="application/json", response={}}
-        local task = {}
+        -- Attempt to load task from user space
+        success, TaskClass = pcall(require, "moko.tasks.user."..name)
+        if not success then
+          local error_message = TaskClass
 
-        for i, name in pairs(pipeline["tasks"]) do
-          -- Clear task output
-          taskOutput = {code=0, format="application/json", response={}}
+          -- Attempt to load system task
+          success, TaskClass = pcall(require, "moko.tasks.system."..name)
 
-          -- Attempt to load task from user space
-          success, TaskClass = pcall(require, "moko.tasks.user."..name)
+          -- If no matching task was found
           if not success then
-            local error_message = TaskClass
-
-            -- Attempt to load system task
-            success, TaskClass = pcall(require, "moko.tasks.system."..name)
-
-            -- If no matching task was found
-            if not success then
-              ngx.log(ngx.ERR, error_message)
-              error({code=404, error="Task "..name.." is not defined."})
-            end
-          end
-
-          -- Create instance of the task
-          task = TaskClass:new()
-
-          -- Pipe task output to next task in pipeline
-
-          -- Convert input to list format if necessary (except for pipeline input)
-          local singleInput = false
-          if (#taskInput == 0 and (next(taskInput) ~= nil or i == 1)) or name == "merge" then
-            taskInput = {taskInput}
-            singleInput = true
-          end
-
-          taskOutput.response = {}
-          for i, input in pairs(taskInput) do
-            output = task:execute(input)
-
-            if output.code > 299 then
-              error({
-                code=output.code,
-                error=output.response.error
-              })
-            end
-
-            if taskOutput.code < output.code then
-              taskOutput.code = output.code
-            end
-
-            taskOutput.format = output.format
-            taskOutput.response[i] = output.response
-          end
-
-          -- Assign input for next task
-          taskInput = {}
-          for i, output in pairs(taskOutput.response) do
-            taskInput[i] = output
-          end
-
-          -- Convert list to element if necessary
-          if singleInput then
-            taskInput = taskInput[1]
-            taskOutput.response = taskOutput.response[1]
+            ngx.log(ngx.ERR, error_message)
+            error({code=404, error="Task "..name.." is not defined."})
           end
         end
 
-        -- Assign final task output to step output
-        stepOutput[label] = taskOutput.response
+        -- Create instance of the task
+        task = TaskClass:new()
 
-        -- Convert to list for processing
-        local singleOutput = false
-        if stepOutput[label] == nil then
-          stepOutput[label] = {}
-        elseif #stepOutput[label] == 0 then
-          stepOutput[label] = {stepOutput[label]}
-          singleOutput = true
+        -- Pipe task output to next task in step. Convert input to list format if necessary
+        local singleInput = false
+        if (#taskInput == 0 and (next(taskInput) ~= nil or i == 1)) or name == "merge" then
+          taskInput = {taskInput}
+          singleInput = true
         end
 
-        -- If there are any step output filters, apply them
-        if step["filters"] then
-          for i, output in ipairs(stepOutput[label]) do
-            local filteredOutput = {}
+        taskOutput.response = {}
+        for i, input in pairs(taskInput) do
+          output = task:execute(input)
 
-            for j, filter in pairs(step["filters"]) do
-              filteredOutput[filter] = stepOutput[label][i][filter]
-            end
-
-            stepOutput[label][i] = filteredOutput
+          if output.code > 299 then
+            error({
+              code=output.code,
+              error=output.response.error
+            })
           end
+
+          if taskOutput.code < output.code then
+            taskOutput.code = output.code
+          end
+
+          taskOutput.format = output.format
+          taskOutput.response[i] = output.response
+        end
+
+        -- Assign input for next task
+        taskInput = {}
+        for i, output in pairs(taskOutput.response) do
+          taskInput[i] = output
         end
 
         -- Convert list to element if necessary
-        if singleOutput then
-          stepOutput[label] = stepOutput[label][1]
+        if singleInput then
+          taskInput = taskInput[1]
+          taskOutput.response = taskOutput.response[1]
+        end
+      end
+
+      -- Persist necessary step outputs to workspace
+      if step.persist then
+        local parsedOutput = self:parseInput(
+          {output=taskOutput.response},
+          step.persist
+        )
+
+        for field, value in pairs(parsedOutput) do
+          workspace[field] = value
+        end
+      end
+
+      -- Set step output as workflow output
+      workflowOutput.content = taskOutput.response
+      workflowOutput.exitCode = taskOutput.code
+      workflowOutput.responseFormat = taskOutput.format
+
+      -- If there are any step output filters, apply them
+      if step.filters then
+        local filteredOutput = {}
+
+        for j, filter in pairs(step.filters) do
+          filteredOutput[filter] = workflowOutput.content[filter]
         end
 
-        exitCode = taskOutput.code
-        responseFormat = taskOutput.format
+        workflowOutput.content = filteredOutput
       end
-
-      -- If there was no step output pass-through input
-      if next(stepOutput) == nil then
-        stepOutput["pass"] = pipelineInput
-      end
-
-      -- Pipe step output into the subsequent step
-      stepInput = stepOutput
-    else
-      stepOutput = stepInput
     end
   end
 
-  -- Simple aggregation of last step pipeline outputs
-  local workflowOutput = {}
-  for pipeline, output in pairs(stepOutput) do
-    for key, value in pairs(output) do
-      workflowOutput[key] = value
-    end
-  end
+  return {
+    code=workflowOutput.exitCode,
+    format=workflowOutput.responseFormat,
+    response=workflowOutput.content
+  }
 
-  return {code=exitCode, format=responseFormat, response=workflowOutput}
 end
 
-function Workflow:parseInput(input, step)
-  local templates = step["data"]
+function Workflow:parseInput(input, mapping)
   local parsedInput = {}
   local missingInput = {}
 
-  for field, template in pairs(templates) do
+  for field, template in pairs(mapping) do
     -- Fetch value from input
     parsedInput[field] = input
     for part in gmatch(template, "[^:]+") do
