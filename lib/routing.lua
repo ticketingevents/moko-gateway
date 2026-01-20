@@ -193,7 +193,7 @@ function Router:buildHandler(endpoint, method, definition)
         end
 
         -- Validate parameters before proceeding
-        if definition.request_validator ~= nil then
+        if definition.parameter_validator ~= nil then
             local parameters = {}
             for parameter, value in pairs(ngx.req.get_uri_args()) do
                 if tonumber(value) ~= nil then
@@ -395,6 +395,8 @@ function Router:parse_schema(config)
                     request_schema.required[#request_schema.required+1] = field
                 elseif name == "enum" then
                     request_schema.properties[field][name] = cjson.decode(value)
+                elseif name == "type" then
+                    request_schema.properties[field]["items"] = {type = value}
                 else
                     request_schema.properties[field][name] = value
                 end
