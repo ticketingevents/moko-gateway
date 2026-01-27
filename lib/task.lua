@@ -27,6 +27,8 @@ function Task:new(instance)
 	instance = instance or {}
 	setmetatable(instance, self)
 	self.__index = self
+
+	instance.uri = ngx.var.uri
 	return instance
 end
 
