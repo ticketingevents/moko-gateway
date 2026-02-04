@@ -15,6 +15,7 @@ local pcall = pcall
 local ngx = ngx
 local next = next
 local type = type
+local string = string
 local gmatch  = string.gmatch
 local unpack  = table.unpack
 local join = require "moko.utilities".join
@@ -80,6 +81,14 @@ function Workflow:run(request)
 
       for field, value in pairs(stepWorkspaceInput) do
         stepInput[field] = value
+      end
+
+      -- Map any literal input
+      for field, value in pairs(step.input) do
+        local literal = string.match(value, "literal:(.+)")
+        if literal then
+          stepInput[field] = literal
+        end
       end
     end
 

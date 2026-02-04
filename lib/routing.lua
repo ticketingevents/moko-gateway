@@ -374,9 +374,10 @@ function Router:parse_schema(config)
     local request_schema = {
         type = "object",
         properties = {},
-        required = {},
         additionalProperties = false
     }
+
+    local required_properties = {}
 
     for field, properties in pairs(config) do
         local type = string.match(properties, "^(%w+)")
@@ -392,7 +393,7 @@ function Router:parse_schema(config)
                 local value = string.match(attribute, "=(.+)")
 
                 if name == "required" then
-                    request_schema.required[#request_schema.required+1] = field
+                    required_properties[#required_properties+1] = field
                 elseif name == "enum" then
                     request_schema.properties[field][name] = cjson.decode(value)
                 elseif name == "type" then
@@ -402,6 +403,10 @@ function Router:parse_schema(config)
                 end
             end
         end
+    end
+
+    if #required_properties > 0 then
+        request_schema.required = required_properties
     end
 
     return request_schema

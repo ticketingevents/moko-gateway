@@ -100,6 +100,10 @@ function Task:tooManyRequests(message)
 	return self:fail(ngx.HTTP_TOO_MANY_REQUESTS, message)
 end
 
+function Task:serverError(message)
+	return self:fail(ngx.HTTP_SERVER_ERROR, message)
+end
+
 function Task:respond(code, payload, format)
 	return {code=code, response=payload, format=format}
 end
