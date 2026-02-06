@@ -101,7 +101,7 @@ function Task:tooManyRequests(message)
 end
 
 function Task:serverError(message)
-	return self:fail(ngx.HTTP_SERVER_ERROR, message)
+	return self:fail(ngx.HTTP_INTERNAL_SERVER_ERROR, message)
 end
 
 function Task:respond(code, payload, format)

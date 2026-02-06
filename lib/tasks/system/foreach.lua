@@ -2,9 +2,9 @@
 local Task = require "moko.task".Task
 
 -- Define Task Class
-Spread = Task:new()
+local ForEach = Task:new()
 
-function Spread:execute(input)
+function ForEach:execute(input)
   local list = {}
 
   for field, value in pairs(input) do
@@ -18,4 +18,4 @@ function Spread:execute(input)
   return self:ok(list)
 end
 
-return Spread
+return ForEach

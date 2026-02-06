@@ -22,7 +22,7 @@ function List:execute(input)
   	list = {input}
   end
 
-  return self:ok({list=list})
+  return self:ok(list)
 end
 
 return List
