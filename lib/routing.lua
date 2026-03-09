@@ -306,37 +306,7 @@ function Router:runWorkflow(label, request, router)
 
         -- Add workflow steps
         for i, step in pairs(self.workflows[label].steps) do
-            -- Handle workflow injection steps
-            if step.inject ~= nil then
-                -- Load injected workflow
-                local injected_workflow = self.workflows[step.inject.workflow]
-
-                -- Add injected steps to workflow
-                for j, injected_step in pairs(injected_workflow.steps) do
-                    -- Create substitute step
-                    local new_step = {
-                        name=injected_step.name,
-                        input={},
-                        persist=injected_step.persist,
-                        tasks=injected_step.tasks,
-                        conditions=injected_step.conditions,
-                        filters=injected_step.filters
-                    }
-
-                    -- Map injected workflow data
-                    for field, value in pairs(injected_step.input) do
-                        new_step.input[field] = injected_step.input[field]
-                        if value == "inject" then
-                            new_step.input[field] = step.inject.input[field]
-                        end
-                    end
-                    
-                    -- Inject step to workflow
-                    workflow:add_step(new_step)
-                end
-            else
-                workflow:add_step(step)
-            end
+            self:__add_step(workflow, step)
         end
 
         -- Run workflow
@@ -410,6 +380,43 @@ function Router:parse_schema(config)
     end
 
     return request_schema
+end
+
+function Router:__add_step(workflow, step)
+    -- Handle workflow injection steps
+    if step.inject ~= nil then
+        -- Load injected workflow
+        local injected_workflow = self.workflows[step.inject.workflow]
+
+        -- Add injected steps to workflow
+        for j, injected_step in pairs(injected_workflow.steps) do
+            -- Create substitute step
+            local new_step = {
+                name=injected_step.name,
+                inject=injected_step.inject,
+                input={},
+                persist=injected_step.persist,
+                tasks=injected_step.tasks,
+                conditions=step.conditions and step.conditions or injected_step.conditions
+            }
+
+            -- Map injected workflow data
+            if injected_step.input then
+                for field, value in pairs(injected_step.input) do
+                    new_step.input[field] = injected_step.input[field]
+                    if value == "inject" then
+                        new_step.input[field] = step.inject.input[field]
+                    end
+                end
+            end
+
+            
+            -- Add step to workflow
+            self:__add_step(workflow, new_step)
+        end
+    else
+        workflow:add_step(step)
+    end
 end
 
 return package

@@ -8,6 +8,7 @@ end
 -- Import Section
 local require = require
 local setmetatable = setmetatable
+local os = os
 local pairs = pairs
 local ipairs = ipairs
 local error = error
@@ -20,6 +21,7 @@ local gmatch  = string.gmatch
 local unpack  = table.unpack
 local join = require "moko.utilities".join
 local cjson = require "cjson.safe"
+local rabbitmq = require "resty.rabbitmqstomp"
 
 -- Encapsulate package
 setfenv(1, package)
@@ -37,6 +39,44 @@ function Workflow:new(instance)
   return instance
 end
 
+function Workflow:setup_rabbitmq()
+  -- Initialise RabbitMQ connection
+  local rabbitmq_connection, initialisation_error = rabbitmq:new({
+    username=os.getenv("STOMP_USERNAME"),
+    password=os.getenv("STOMP_PASSWORD")
+  })
+
+  -- Set RabbitMQ Connection Timeout
+  rabbitmq_connection:set_timeout(30000)
+  rabbitmq_connection:set_keepalive(10000, 100)
+
+  if not rabbitmq_connection then
+    io.stderr:write("Failed to create RabbitMQ client: "..initialisation_error)
+
+    error({
+      code=ngx.HTTP_SERVICE_UNAVAILABLE,
+      error="The server was unable to communicate with a required upstream service."
+    })
+  end
+
+  -- Connect to RabbitMQ over STOMP
+  local connection_ok, connection_error = rabbitmq_connection:connect(
+    os.getenv("STOMP_HOST"),
+    os.getenv("STOMP_PORT")
+  )
+
+  if not connection_ok then
+    io.stderr:write("Failed to connect to RabbitMQ: "..connection_error)
+
+    error({
+      code=ngx.HTTP_SERVICE_UNAVAILABLE,
+      error="The server was unable to communicate with a required upstream service."
+    })
+  end
+
+  return rabbitmq_connection
+end
+
 function Workflow:add_step(step)
   -- Add workflow step
   self.steps[#self.steps+1] = step
@@ -46,6 +86,8 @@ function Workflow:run(request)
   local exitCode = 0
   local workspace = {}
   local workflowOutput = {}
+
+  local rabbitmq = self:setup_rabbitmq()
 
   for i, step in ipairs(self.steps) do
     local stepInput = {}
@@ -96,8 +138,17 @@ function Workflow:run(request)
     local conditions_met = true
 
     if step.conditions then
-      for field, value in pairs(step.conditions) do
-        conditions_met = conditions_met and (stepInput[field] == value)
+      for comparison, arguments in pairs(step.conditions) do
+        for field, value in pairs(arguments) do
+          evaluation = false
+          if comparison == "equals" then
+            evaluation = (cjson.encode(workspace[field])== cjson.encode(value))
+          elseif comparison == "not" then
+            evaluation = (cjson.encode(workspace[field]) ~= cjson.encode(value))
+          end
+
+          conditions_met = conditions_met and evaluation
+        end
       end
     end
 
@@ -139,6 +190,7 @@ function Workflow:run(request)
 
         taskOutput.response = {}
         for i, input in pairs(taskInput) do
+          task:init(rabbitmq)
           output = task:execute(input)
 
           if output.code > 299 then
@@ -185,17 +237,16 @@ function Workflow:run(request)
       workflowOutput.content = taskOutput.response
       workflowOutput.exitCode = taskOutput.code
       workflowOutput.responseFormat = taskOutput.format
+    end
+  end
 
-      -- If there are any step output filters, apply them
-      if step.filters then
-        local filteredOutput = {}
+  -- Cleanup RabbitMQ connection
+  if rabbitmq ~= nil then
+    -- Close RabbitMQ connection
+    local disconnection_ok, disconnection_error = rabbitmq:close()
 
-        for j, filter in pairs(step.filters) do
-          filteredOutput[filter] = workflowOutput.content[filter]
-        end
-
-        workflowOutput.content = filteredOutput
-      end
+    if not disconnection_ok then
+      io.stderr:write("Failed to close RabbitMQ connection: "..disconnection_error)
     end
   end
 

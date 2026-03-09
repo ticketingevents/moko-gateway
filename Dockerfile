@@ -6,6 +6,14 @@ ENV SERVICE_DNS=127.0.0.11
 # Install python and libraries
 RUN apt update -y && apt install -y python3 python3-pip git libpcre3 libpcre3-dev
 
+# Install timezones
+ENV TZ=UTC
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
+    echo $TZ > /etc/timezone && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata && \
+    apt-get clean
+
 # Install python libraries
 RUN pip install pyyaml
 
@@ -17,6 +25,9 @@ RUN luarocks install luasocket
 RUN luarocks install net-url
 RUN luarocks install lrexlib-pcre
 RUN luarocks install jsonschema
+RUN luarocks install lua-yaml
+RUN luarocks install lua-tz
+RUN luarocks install md5
 
 # Install Moko Gateway library
 COPY ./lib /usr/local/openresty/site/lualib/moko

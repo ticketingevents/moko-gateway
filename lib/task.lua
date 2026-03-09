@@ -14,7 +14,7 @@ local error = error
 local math = math
 local tostring = tostring
 local cjson = require "cjson.safe"
-local rabbitmq = require "resty.rabbitmqstomp"
+local md5 = require "md5"
 local Service = require "moko.service".Service
     
 -- Encapsulate package
@@ -26,10 +26,15 @@ Task = {}
 function Task:new(instance)
 	instance = instance or {}
 	setmetatable(instance, self)
-	self.__index = self
 
+	self.__index = self
 	instance.uri = ngx.var.uri
+
 	return instance
+end
+
+function Task:init(rabbitmq)
+	self.rabbitmq = rabbitmq
 end
 
 function Task:buildService(name)
@@ -119,79 +124,26 @@ function Task:rpc(procedure, arguments)
 		arguments=arguments and arguments or {}
 	}
 
-	-- Initialise RabbitMQ connection
-	local rabbitmq_connection, initialisation_error = rabbitmq:new({
-		username=os.getenv("STOMP_USERNAME"),
-		password=os.getenv("STOMP_PASSWORD")
-	})
-
-	if not rabbitmq_connection then
-		io.stderr:write("Failed to create RabbitMQ client: "..initialisation_error)
-
-		error({
-			code=ngx.HTTP_SERVICE_UNAVAILABLE,
-			error="The server was unable to communicate with a required upstream service."
-		})
-	end
-
-	-- Set RabbitMQ Connection Timeout
-	rabbitmq_connection:set_timeout(30000)
-
-	-- Connect to RabbitMQ over STOMP
-	local connection_ok, connection_error = rabbitmq_connection:connect(
-		os.getenv("STOMP_HOST"),
-		os.getenv("STOMP_PORT")
+	-- Generate correlation ID
+	local correlation_id = md5.sumhexa(
+		ngx.var.request_id..
+		procedure..
+		(ngx.now() * 1000)
 	)
-
-	if not connection_ok then
-		io.stderr:write("Failed to connect to RabbitMQ: "..connection_error)
-
-		error({
-			code=ngx.HTTP_SERVICE_UNAVAILABLE,
-			error="The server was unable to communicate with a required upstream service."
-		})
-	end
-
-	-- Seed random number
-	math.randomseed(os.time() + os.clock())
-
-	-- Setup message response consumer
-	local subscription_id = tostring(math.random(1000000, 9999999))
-	local response_queue = "gateway-"..subscription_id
-	local subscription_ok, subscription_error = rabbitmq_connection:subscribe({
-		id=subscription_id,
-		destination="/queue/"..response_queue,
-		persistent="false",
-		['auto-delete']="true",
-		["content-type"]="application/json"
-	})
-
-	if not subscription_ok then
-		io.stderr:write("Failed to subscribe to RabbitMQ response queue: "..subscription_error)
-
-		error({
-			code=ngx.HTTP_SERVICE_UNAVAILABLE,
-			error="The server was unable to communicate with a required upstream service."
-		})
-	end
 
 	-- Publish message to RabbitMQ over STOMP
 	local headers = {
 		destination="/exchange/"..parameters.exchange.."/"..parameters.procedure,
-		persistent="true",
+		["reply-to"] = "/temp-queue/replies",
+  		["correlation-id"] = correlation_id,
 		["content-type"]="application/json"
 	}
-
-	-- Generate correlation ID
-	local correlation_id = tostring(math.random(1000000, 9999999))
-	parameters.arguments["reply_to"] = response_queue
-	parameters.arguments["correlation_id"] = correlation_id
 
 	cjson.encode_empty_table_as_object(true)
 	local body = cjson.encode(parameters.arguments)
 	cjson.encode_empty_table_as_object(false)
 
-	local send_ok, send_error = rabbitmq_connection:send(
+	local send_ok, send_error = self.rabbitmq:send(
 		body,
 		headers
 	)
@@ -210,7 +162,7 @@ function Task:rpc(procedure, arguments)
 
 	start = os.time()
 	while not response and (os.time() - start) < 30 do
-		data, receipt_error = rabbitmq_connection:receive()
+		data, receipt_error = self.rabbitmq:receive()
 
 
 		if not data then
@@ -234,34 +186,12 @@ function Task:rpc(procedure, arguments)
 			})
 		end
 
-		if parsed_data["correlation_id"] == correlation_id then
+		if parsed_data["correlation-id"] == correlation_id then
 			response = parsed_data
 		end
 	end
 
-	-- Unsubscribe from response queue
-	local unsubscription_ok, unsubscription_error = rabbitmq_connection:unsubscribe({
-		id=subscription_id
-	})
-
-	if not unsubscription_ok then
-		io.stderr:write("Failed to unsubscribe from RabbitMQ response queue: "..unsubscription_error)
-
-		error({
-			code=ngx.HTTP_SERVICE_UNAVAILABLE,
-			error="The server was unable to communicate with a required upstream service."
-		})
-	end
-
-	-- Close RabbitMQ connection
-	local disconnection_ok, disconnection_error = rabbitmq_connection:close()
-
-	if not disconnection_ok then
-		io.stderr:write("Failed to close RabbitMQ connection: "..disconnection_error)
-	end
-
 	return response
-
 end
 
 return package
