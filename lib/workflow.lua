@@ -51,7 +51,7 @@ function Workflow:setup_rabbitmq()
   rabbitmq_connection:set_keepalive(10000, 100)
 
   if not rabbitmq_connection then
-    io.stderr:write("Failed to create RabbitMQ client: "..initialisation_error)
+    ngx.log(ngx.ERR, "Failed to create RabbitMQ client: "..initialisation_error)
 
     error({
       code=ngx.HTTP_SERVICE_UNAVAILABLE,
@@ -66,7 +66,7 @@ function Workflow:setup_rabbitmq()
   )
 
   if not connection_ok then
-    io.stderr:write("Failed to connect to RabbitMQ: "..connection_error)
+    ngx.log(ngx.ERR, "Failed to connect to RabbitMQ: "..connection_error)
 
     error({
       code=ngx.HTTP_SERVICE_UNAVAILABLE,
@@ -246,7 +246,7 @@ function Workflow:run(request)
     local disconnection_ok, disconnection_error = rabbitmq:close()
 
     if not disconnection_ok then
-      io.stderr:write("Failed to close RabbitMQ connection: "..disconnection_error)
+      ngx.log(ngx.ERR, "Failed to close RabbitMQ connection: "..disconnection_error)
     end
   end
 
