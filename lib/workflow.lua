@@ -142,9 +142,9 @@ function Workflow:run(request)
         for field, value in pairs(arguments) do
           evaluation = false
           if comparison == "equals" then
-            evaluation = (cjson.encode(workspace[field])== cjson.encode(value))
+            evaluation = self:checkCondition(workspace[field], value)
           elseif comparison == "not" then
-            evaluation = (cjson.encode(workspace[field]) ~= cjson.encode(value))
+            evaluation = not self:checkCondition(workspace[field], value)
           end
 
           conditions_met = conditions_met and evaluation
@@ -275,6 +275,28 @@ function Workflow:parseInput(input, mapping)
   end
 
   return parsedInput, missingInput
+end
+
+function Workflow:checkCondition(condition, value)
+  if type(condition) ~= type(value) then
+    return false
+  end
+
+  if type(condition) ~= "table" then
+    return condition == value
+  else
+    local match = true
+
+    for k, v in ipairs(condition) do
+      match = match and self:checkCondition(condition[k], value[k])
+    end
+    
+    for k, v in ipairs(value) do
+      match = match and self:checkCondition(condition[k], value[k])
+    end
+
+    return match
+  end
 end
 
 return package

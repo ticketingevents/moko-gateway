@@ -27,7 +27,7 @@ local Cache = require "moko.cache".Cache
 local Profiler = require "moko.profiler".Profiler
 
 -- Formatting options
-cjson.encode_empty_table_as_object(false)
+cjson.decode_array_with_array_mt(true)
 
 -- Encapsulate package
 setfenv(1, package)

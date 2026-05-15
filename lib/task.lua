@@ -139,9 +139,7 @@ function Task:rpc(procedure, arguments)
 		["content-type"]="application/json"
 	}
 
-	cjson.encode_empty_table_as_object(true)
 	local body = cjson.encode(parameters.arguments)
-	cjson.encode_empty_table_as_object(false)
 
 	local send_ok, send_error = self.rabbitmq:send(
 		body,
