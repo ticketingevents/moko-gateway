@@ -353,8 +353,10 @@ function Router:parse_schema(config)
         local type = string.match(properties, "^(%w+)")
         local attributes = string.match(properties, "%(([^%)]+)%)")
         
-        if type ~= nil then
+        if type ~= nil and type ~= "any" then
             request_schema.properties[field] = {type = type}
+        elseif type == "any" then
+            request_schema.properties[field] = {}
         end
 
         if attributes ~= nil then
@@ -393,7 +395,10 @@ function Router:__add_step(workflow, step)
             -- Create substitute step
             local new_step = {
                 name=injected_step.name,
-                inject=injected_step.inject,
+                inject=injected_step.inject and {
+                    workflow=injected_step.inject.workflow,
+                    input={}
+                } or nil,
                 input={},
                 persist=injected_step.persist,
                 tasks=injected_step.tasks,
@@ -406,6 +411,13 @@ function Router:__add_step(workflow, step)
                     new_step.input[field] = injected_step.input[field]
                     if value == "inject" then
                         new_step.input[field] = step.inject.input[field]
+                    end
+                end
+            elseif injected_step.inject and injected_step.inject.input then
+                for field, value in pairs(injected_step.inject.input) do
+                    new_step.inject.input[field] = injected_step.inject.input[field]
+                    if value == "inject" then
+                        new_step.inject.input[field] = step.inject.input[field]
                     end
                 end
             end
